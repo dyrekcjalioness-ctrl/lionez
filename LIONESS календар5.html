@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LIONESS Kalendarz 2 — działa offline</title>
+<style>
+:root{
+  --bg:#071529; --panel:#0f2743; --muted:#9fb0d0; --accent:#f0b400;
+  --green:#2ecc71; --purple:#8e44ad; --red:#e74c3c;
+  --card-shadow: 0 10px 30px rgba(2,12,27,0.6);
+  --radius:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#fff;font-family:Inter, Arial, sans-serif;padding:14px;}
+.app{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:520px 1fr;gap:18px;align-items:start}
+.panel{background:var(--panel);border-radius:var(--radius);padding:14px;box-shadow:var(--card-shadow)}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.btn{background:#0b3a63;border:none;color:#fff;padding:8px 10px;border-radius:8px;cursor:pointer}
+.small{color:var(--muted);font-size:13px}
+.weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.cell{min-height:80px;border-radius:8px;padding:10px;position:relative;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);cursor:pointer}
+.cell:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,0.45)}
+.daynum{font-weight:700;font-size:15px}
+.slots-preview{position:absolute;left:8px;right:8px;bottom:8px;font-size:12px;opacity:.95;text-align:right}
+.color-green{box-shadow: inset 0 0 0 2px rgba(46,204,113,0.06)}
+.color-purple{box-shadow: inset 0 0 0 2px rgba(142,68,173,0.06)}
+.color-red{box-shadow: inset 0 0 0 2px rgba(231,76,60,0.06)}
+.right{display:flex;flex-direction:column;gap:12px}
+.hours-wrap{display:block;max-height:calc(100vh - 200px);overflow:auto;padding-right:6px}
+.hour-row{display:flex;align-items:flex-start;justify-content:space-between;padding:10px;border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,0.02);cursor:pointer}
+.hour-time{width:84px;opacity:.95;font-weight:700}
+.hour-info{flex:1;padding:6px 10px;border-radius:8px;background:transparent;margin-left:10px;display:flex;flex-direction:column;gap:6px}
+.hour-top{display:flex;justify-content:space-between;align-items:center}
+.hour-name{font-weight:700}
+.hour-bottom{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:13px}
+.add-btn{background:#0a84ff;padding:6px 10px;border-radius:8px;color:#fff;border:none;cursor:pointer}
+.edit-btn{background:#ffb86b;padding:6px 10px;border-radius:8px;color:#000;border:none;cursor:pointer}
+.del-btn{background:#b83b3b;padding:6px 10px;border-radius:8px;color:#fff;border:none;cursor:pointer}
+.form{margin-top:10px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02)}
+.input{width:100%;padding:9px;border-radius:8px;border:0;background:rgba(255,255,255,0.03);color:#fff;margin-bottom:8px}
+.row{display:flex;gap:8px}
+.row .input{flex:1}
+.controls{display:flex;gap:8px;justify-content:flex-end}
+.save{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#000;font-weight:700;cursor:pointer}
+.cancel{background:#4b6b8f;border:none;padding:8px 12px;border-radius:8px;color:#fff;cursor:pointer}
+.note{font-size:13px;color:var(--muted)}
+.badge{position:absolute;right:8px;bottom:8px;background:#ffd86b;color:#000;padding:4px 6px;border-radius:8px;font-weight:700;font-size:12px}
+.reserved{background:rgba(200,60,60,0.12)}
+@media (max-width:980px){.app{grid-template-columns:1fr} .hours-wrap{max-height:300px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- LEFT: Month calendar -->
+  <div class="panel">
+    <div class="header">
+      <button id="prev" class="btn">‹</button>
+      <div style="text-align:center">
+        <div id="monthTitle" style="font-weight:800;font-size:18px">Miesiąc Rok</div>
+        <div class="small">Kliknij datę → po prawej wyświetlą się godziny</div>
+      </div>
+      <button id="next" class="btn">›</button>
+    </div>
+
+    <div class="weekdays" id="weekdaysRow">
+      <div>Pon</div><div>Wt</div><div>Śr</div><div>Czw</div><div>Pt</div><div>Sob</div><div>Ndz</div>
+    </div>
+    <div id="calendarGrid" class="grid"></div>
+  </div>
+
+  <!-- RIGHT: Hours + form -->
+  <div class="right">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700" id="selectedDateLabel">Wybierz datę</div>
+          <div class="note" id="slotsSummary"> </div>
+        </div>
+        <div class="note" id="liveNote">lokalnie</div>
+      </div>
+
+      <div class="hours-wrap" id="hoursWrap">
+        <!-- hours rows inserted here -->
+      </div>
+
+      <div id="formPanel" class="form" style="display:none">
+        <div style="font-weight:800;margin-bottom:8px" id="formTimeLabel">07:00</div>
+        <input class="input" id="inpName" placeholder="Imię i nazwisko">
+        <input class="input" id="inpPhone" placeholder="Telefon">
+        <div class="row">
+          <input class="input" id="inpReg" placeholder="Nr rejestracyjny">
+          <input class="input" id="inpAddr" placeholder="Adres">
+        </div>
+        <input class="input" id="inpNote" placeholder="Notatki">
+        <div class="controls" style="margin-top:8px">
+          <button id="deleteBtn" class="del-btn" style="display:none">Usuń</button>
+          <button id="cancelBtn" class="cancel">Anuluj</button>
+          <button id="saveBtn" class="save">Zapisz</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* SETTINGS */
+const HOURS = ["07:00","09:00","11:00","13:00","15:00","17:00","19:00","21:00"];
+const LS_KEY = 'lioness_calendar2';
+
+/* DOM */
+const calendarGrid = document.getElementById('calendarGrid');
+const monthTitle = document.getElementById('monthTitle');
+const prevBtn = document.getElementById('prev'), nextBtn = document.getElementById('next');
+const selectedDateLabel = document.getElementById('selectedDateLabel');
+const hoursWrap = document.getElementById('hoursWrap');
+const slotsSummary = document.getElementById('slotsSummary');
+
+const formPanel = document.getElementById('formPanel');
+const formTimeLabel = document.getElementById('formTimeLabel');
+const inpName = document.getElementById('inpName');
+const inpPhone = document.getElementById('inpPhone');
+const inpReg = document.getElementById('inpReg');
+const inpAddr = document.getElementById('inpAddr');
+const inpNote = document.getElementById('inpNote');
+const saveBtn = document.getElementById('saveBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+
+let cur = new Date();
+let selectedKey = null; // 'YYYY-MM-DD'
+let selectedTime = null;
+
+/* helpers */
+function pad(n){return String(n).padStart(2,'0');}
+function dateKeyFrom(y,m,d){ return `${y}-${pad(m)}-${pad(d)}`; }
+
+/* local storage helpers */
+function loadAll(){ return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
+function saveAll(obj){ localStorage.setItem(LS_KEY, JSON.stringify(obj)); }
+function loadDay(key){ const all=loadAll(); return all[key] || {}; }
+function saveDay(key, dayObj){ const all=loadAll(); all[key]=dayObj; saveAll(all); }
+function deleteSlot(key,time){ const all=loadAll(); if(!all[key]) return; delete all[key][time]; if(Object.keys(all[key]).length===0) delete all[key]; saveAll(all); }
+
+/* render month */
+function renderMonth(){
+  calendarGrid.innerHTML='';
+  cur.setDate(1);
+  const month = cur.getMonth(), year = cur.getFullYear();
+  monthTitle.textContent = new Date(year,month).toLocaleString('pl-PL',{month:'long', year:'numeric'});
+
+  const firstDayIndex = (new Date(year,month,1).getDay() + 6) % 7; // Monday=0
+  const lastDay = new Date(year,month+1,0).getDate();
+
+  // leading blanks
+  for(let i=0;i<firstDayIndex;i++) calendarGrid.appendChild(document.createElement('div'));
+
+  for(let d=1; d<=lastDay; d++){
+    const key = dateKeyFrom(year, month+1, d); // careful: month+1 for human month
+    const dayObj = loadDay(key);
+    const cnt = Object.keys(dayObj).length;
+
+    const cell = document.createElement('div');
+    cell.className='cell panel';
+    const dn = document.createElement('div'); dn.className='daynum'; dn.textContent = d;
+    const preview = document.createElement('div'); preview.className='slots-preview small';
+    if(cnt) preview.textContent = `${cnt} zapis(ów)`;
+    cell.appendChild(dn); cell.appendChild(preview);
+    if(cnt>0 && cnt<=2) cell.classList.add('color-green');
+    else if(cnt>0 && cnt>=Math.ceil(HOURS.length/2)) cell.classList.add('color-purple');
+    else if(cnt>0 && cnt>=HOURS.length) cell.classList.add('color-red');
+
+    cell.addEventListener('click', ()=> openDate(key, d, month+1, year));
+    calendarGrid.appendChild(cell);
+  }
+}
+
+/* open date */
+function openDate(key,d,m,y){
+  selectedKey = key;
+  selectedDateLabel.textContent = `Data: ${key}`;
+  renderHoursSkeleton();
+  renderHoursWithData(loadDay(key));
+}
+
+/* always show hours skeleton */
+function renderHoursSkeleton(){
+  hoursWrap.innerHTML='';
+  formPanel.style.display='none';
+  selectedTime=null;
+  HOURS.forEach(time=>{
+    const row = document.createElement('div'); row.className='hour-row';
+    const timeCol = document.createElement('div'); timeCol.className='hour-time'; timeCol.textContent=time;
+    const info = document.createElement('div'); info.className='hour-info';
+    const top = document.createElement('div'); top.className='hour-top';
+    const name = document.createElement('div'); name.className='hour-name'; name.textContent='';
+    const right = document.createElement('div');
+    const addBtn = document.createElement('button'); addBtn.className='add-btn'; addBtn.textContent='➕';
+    addBtn.onclick = ()=> openFormFor(time, null);
+    right.appendChild(addBtn);
+    top.appendChild(name); top.appendChild(right);
+    const bottom = document.createElement('div'); bottom.className='hour-bottom';
+    info.appendChild(top); info.appendChild(bottom);
+    row.appendChild(timeCol); row.appendChild(info);
+    hoursWrap.appendChild(row);
+  });
+  slotsSummary.textContent='';
+}
+
+/* render hours with data */
+function renderHoursWithData(data){
+  hoursWrap.innerHTML='';
+  let used=0;
+  HOURS.forEach(time=>{
+    const row = document.createElement('div'); row.className='hour-row';
+    const timeCol = document.createElement('div'); timeCol.className='hour-time'; timeCol.textContent=time;
+    const info = document.createElement('div'); info.className='hour-info';
+
+    if(data && data[time]){
+      used++;
+      const c = data[time];
+      const top = document.createElement('div'); top.className='hour-top';
+      const nameDiv = document.createElement('div'); nameDiv.className='hour-name'; nameDiv.textContent = c.name || '';
+      const btns = document.createElement('div');
+      const editBtn = document.createElement('button'); editBtn.className='edit-btn'; editBtn.textContent='Edytuj';
+      const delBtn = document.createElement('button'); delBtn.className='del-btn'; delBtn.textContent='Usuń';
+      editBtn.onclick = ()=> openFormFor(time, c);
+      delBtn.onclick = ()=> { if(confirm('Usuń wpis?')){ deleteSlot(selectedKey, time); renderHoursWithData(loadDay(selectedKey)); renderMonth(); } };
+      btns.appendChild(editBtn); btns.appendChild(delBtn);
+      top.appendChild(nameDiv); top.appendChild(btns);
+
+      const bottom = document.createElement('div'); bottom.className='hour-bottom';
+      if(c.phone){ const s=document.createElement('span'); s.textContent=`📞 ${c.phone}`; bottom.appendChild(s);}
+      if(c.reg){ const s=document.createElement('span'); s.textContent=`🚗 ${c.reg}`; bottom.appendChild(s);}
+      if(c.addr){ const s=document.createElement('span'); s.textContent=`🏠 ${c.addr}`; bottom.appendChild(s);}
+      if(c.note){ const s=document.createElement('span'); s.textContent=`📝 ${c.note}`; bottom.appendChild(s);}
+
+      info.appendChild(top); info.appendChild(bottom);
+      row.appendChild(timeCol); row.appendChild(info);
+      row.classList.add('reserved');
+    } else {
+      const top = document.createElement('div'); top.className='hour-top';
+      const nameDiv = document.createElement('div'); nameDiv.className='hour-name'; nameDiv.textContent = '';
+      const right = document.createElement('div');
+      const addBtn = document.createElement('button'); addBtn.className='add-btn'; addBtn.textContent='➕';
+      addBtn.onclick = ()=> openFormFor(time, null);
+      right.appendChild(addBtn);
+      top.appendChild(nameDiv); top.appendChild(right);
+      const bottom = document.createElement('div'); bottom.className='hour-bottom';
+      info.appendChild(top); info.appendChild(bottom);
+      row.appendChild(timeCol); row.appendChild(info);
+    }
+
+    hoursWrap.appendChild(row);
+  });
+  slotsSummary.textContent = `${used}/${HOURS.length} zajętych`;
+}
+
+/* open form */
+function openFormFor(time, oldData){
+  selectedTime = time;
+  formTimeLabel.textContent = time;
+  formPanel.style.display = 'block';
+  inpName.value = oldData?.name || '';
+  inpPhone.value = oldData?.phone || '';
+  inpReg.value = oldData?.reg || '';
+  inpAddr.value = oldData?.addr || '';
+  inpNote.value = oldData?.note || '';
+  deleteBtn.style.display = oldData ? 'inline-block' : 'none';
+}
+
+/* save */
+saveBtn.addEventListener('click', ()=>{
+  if(!selectedKey || !selectedTime){ alert('Wybierz datę i godzinę'); return; }
+  const name = inpName.value.trim();
+  const phone = inpPhone.value.trim();
+  if(!name || !phone){ alert('Wpisz Imię i numer telefonu'); return; }
+  const reg = inpReg.value.trim();
+  const addr = inpAddr.value.trim();
+  const note = inpNote.value.trim();
+
+  const day = loadDay(selectedKey);
+  day[selectedTime] = { name, phone, reg, addr, note };
+  saveDay(selectedKey, day);
+  formPanel.style.display='none';
+  renderHoursWithData(day);
+  renderMonth();
+});
+
+/* cancel */
+cancelBtn.addEventListener('click', ()=>{ formPanel.style.display='none'; });
+
+/* delete */
+deleteBtn.addEventListener('click', ()=>{
+  if(!selectedKey || !selectedTime) return;
+  if(!confirm('Usuń wpis?')) return;
+  deleteSlot(selectedKey, selectedTime);
+  formPanel.style.display='none';
+  const day = loadDay(selectedKey);
+  renderHoursWithData(day);
+  renderMonth();
+});
+
+/* nav */
+prevBtn.addEventListener('click', ()=>{ cur.setMonth(cur.getMonth()-1); renderMonth(); });
+nextBtn.addEventListener('click', ()=>{ cur.setMonth(cur.getMonth()+1); renderMonth(); });
+
+/* init */
+renderMonth();
+/* auto-open today if exists */
+(function(){
+  const td = new Date();
+  const key = dateKeyFrom(td.getFullYear(), td.getMonth()+1, td.getDate());
+  // open today's cell if present in grid
+  const cells = document.querySelectorAll('#calendarGrid .cell');
+  for(const c of cells){
+    if(c.dataset && c.dataset.key && c.dataset.key === key){ c.click(); return; }
+  }
+  // if not found, just select today logically
+  // find first day with matching date
+  // (we'll set selectedKey to today and render hours)
+  selectedKey = key;
+  selectedDateLabel.textContent = `Data: ${selectedKey}`;
+  renderHoursWithData(loadDay(selectedKey));
+})();
+
+</script>
+</body>
+</html>
