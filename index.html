@@ -325,11 +325,32 @@ renderMonth();
   selectedDateLabel.textContent = `Data: ${selectedKey}`;
   renderHoursWithData(loadDay(selectedKey));
 })();
-
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAyadUz8qTe4Dz087X9c5_s_Z8rhrgHk_ZpMv5ecRA-SBhxk9144KAGgFnVOhk9hVy/exec";
+
+document.getElementById("saveBtn").onclick = function () {
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      date: selectedKey,
+      time: selectedTime,
+      name: inpName.value,
+      phone: inpPhone.value,
+      reg: inpReg.value,
+      addr: inpAddr.value,
+      note: inpNote.value
+    })
+  })
+  .then(r => r.text())
+  .then(t => alert(t))
+  .catch(err => alert("ERROR: " + err));
+};
+
 </script>
 </body>
 </html>
+
 
 
 
