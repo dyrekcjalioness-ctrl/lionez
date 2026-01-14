@@ -97,7 +97,23 @@ body{margin:0;background:var(--bg);color:#fff;font-family:Inter, Arial, sans-ser
         <div class="controls" style="margin-top:8px">
           <button id="deleteBtn" class="del-btn" style="display:none">Usuń</button>
           <button id="cancelBtn" class="cancel">Anuluj</button>
-          <button id="saveBtn" class="save">Zapisz</button>
+          <button id="saveBtn" class="save">Zapisz</button>  
+          fetch(SCRIPT_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    date: selectedKey,
+    time: selectedTime,
+    name: inpName.value,
+    phone: inpPhone.value,
+    reg: inpReg.value,
+    addr: inpAddr.value,
+    note: inpNote.value
+  })
+})
+.then(r => r.text())
+.then(t => alert(t));
+
         </div>
       </div>
 
@@ -330,4 +346,5 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAyadUz8qTe4Dz087X9
 </script>
 </body>
 </html>
+
 
